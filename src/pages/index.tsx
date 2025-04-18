@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Container, Heading, Text, Image, SimpleGrid, Spinner, VStack, HStack, Badge } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, Image, SimpleGrid, Spinner, VStack, HStack, Badge, Input, Button, Alert, AlertIcon, AlertTitle, AlertDescription } from '@chakra-ui/react';
 import NextLink from 'next/link';
 import { Link } from '@chakra-ui/react';
+import { useRouter } from 'next/router';
 
 interface Movie {
   id: number;
@@ -15,6 +16,8 @@ export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     const fetchRecentMovies = async () => {
@@ -50,6 +53,40 @@ export default function Home() {
     fetchRecentMovies();
   }, []);
 
+  // 搜尋電影
+  const searchMovies = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) {
+      setError('請輸入搜尋關鍵字');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `https://api.themoviedb.org/3/search/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&query=${encodeURIComponent(searchQuery)}`
+      );
+
+      if (!response.ok) {
+        throw new Error('搜尋失敗');
+      }
+
+      const data = await response.json();
+      if (data.results.length === 0) {
+        setError('沒有找到相關電影');
+        setMovies([]);
+      } else {
+        setMovies(data.results);
+        setError(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '搜尋時發生錯誤');
+      setMovies([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container maxW="container.xl" py={8}>
       <VStack spacing={8} align="stretch">
@@ -60,6 +97,22 @@ export default function Home() {
           <Text color="gray.600">
             查看最近兩個月上映的熱門電影
           </Text>
+        </Box>
+
+        <Box>
+          <Heading mb={4}>電影搜尋</Heading>
+          <form onSubmit={searchMovies}>
+            <HStack>
+              <Input
+                placeholder="輸入電影名稱..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Button type="submit" colorScheme="blue">
+                搜尋
+              </Button>
+            </HStack>
+          </form>
         </Box>
 
         {loading && (
