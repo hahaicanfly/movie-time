@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import {
     Box,
@@ -10,121 +10,140 @@ import {
     HStack,
     Badge,
     Spinner,
+    Grid,
+    GridItem,
+    Alert,
+    AlertIcon,
+    AlertTitle,
+    AlertDescription,
+    Divider,
 } from '@chakra-ui/react';
-import { tmdbService } from '../../api/tmdb';
 
-interface MovieDetail extends Movie {
+interface MovieDetails {
+    id: number;
+    title: string;
+    overview: string;
+    poster_path: string;
+    backdrop_path: string;
+    release_date: string;
+    vote_average: number;
     genres: { id: number; name: string }[];
     runtime: number;
-    overview: string;
-    backdrop_path: string;
+    status: string;
 }
 
-export default function MovieDetail() {
+export default function MovieDetails() {
     const router = useRouter();
     const { id } = router.query;
-    const [movie, setMovie] = useState<MovieDetail | null>(null);
+    const [movie, setMovie] = useState<MovieDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        async function fetchMovieDetail() {
+        const fetchMovieDetails = async () => {
             if (!id) return;
-            
+
             try {
-                setLoading(true);
-                const data = await tmdbService.getMovieDetails(Number(id));
+                const response = await fetch(
+                    `https://api.themoviedb.org/3/movie/${id}?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`
+                );
+                const data = await response.json();
                 setMovie(data);
-            } catch (err) {
-                setError('無法載入電影詳情');
-                console.error('獲取電影詳情時出錯:', err);
+            } catch (error) {
+                setError('無法載入電影詳細資訊');
+                console.error('Error fetching movie details:', error);
             } finally {
                 setLoading(false);
             }
-        }
+        };
 
-        fetchMovieDetail();
+        fetchMovieDetails();
     }, [id]);
 
     if (loading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minH="100vh">
+            <Box textAlign="center" py={20}>
                 <Spinner size="xl" />
+                <Text mt={4}>正在載入電影資訊...</Text>
             </Box>
         );
     }
 
-    if (error || !movie) {
+    if (error) {
         return (
-            <Box p={4} textAlign="center">
-                <Text color="red.500">{error || '找不到電影資訊'}</Text>
-            </Box>
+            <Alert status="error">
+                <AlertIcon />
+                <AlertTitle>錯誤</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+            </Alert>
+        );
+    }
+
+    if (!movie) {
+        return (
+            <Alert status="warning">
+                <AlertIcon />
+                <AlertTitle>找不到電影</AlertTitle>
+                <AlertDescription>請確認電影 ID 是否正確</AlertDescription>
+            </Alert>
         );
     }
 
     return (
         <Container maxW="container.xl" py={8}>
-            <Box
-                position="relative"
-                height="400px"
-                mb={8}
-                borderRadius="lg"
-                overflow="hidden"
-            >
-                <Image
-                    src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`}
-                    alt={movie.title}
-                    objectFit="cover"
-                    width="100%"
-                    height="100%"
-                    fallbackSrc="https://via.placeholder.com/1920x1080"
-                />
-            </Box>
-
-            <HStack spacing={8} align="flex-start">
-                <Image
-                    src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                    alt={movie.title}
-                    borderRadius="lg"
-                    width="300px"
-                    fallbackSrc="https://via.placeholder.com/500x750"
-                />
-
-                <VStack align="flex-start" spacing={4}>
-                    <Heading as="h1" size="2xl">
-                        {movie.title}
-                    </Heading>
-
-                    <HStack wrap="wrap" spacing={2}>
-                        {movie.genres.map((genre) => (
-                            <Badge key={genre.id} colorScheme="teal">
-                                {genre.name}
+            <Grid templateColumns={{ base: '1fr', md: '1fr 2fr' }} gap={8}>
+                <GridItem>
+                    <Image
+                        src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                        alt={movie.title}
+                        borderRadius="lg"
+                        fallbackSrc="https://via.placeholder.com/500x750"
+                    />
+                </GridItem>
+                <GridItem>
+                    <VStack align="start" spacing={4}>
+                        <Heading as="h1" size="2xl">
+                            {movie.title}
+                        </Heading>
+                        
+                        <HStack spacing={2}>
+                            <Badge colorScheme="green" fontSize="md">
+                                {movie.vote_average.toFixed(1)} 分
                             </Badge>
-                        ))}
-                    </HStack>
+                            <Badge colorScheme="blue" fontSize="md">
+                                {movie.release_date}
+                            </Badge>
+                            <Badge colorScheme="purple" fontSize="md">
+                                {movie.runtime} 分鐘
+                            </Badge>
+                        </HStack>
 
-                    <Text fontSize="lg" color="yellow.500">
-                        ★ {movie.vote_average.toFixed(1)}
-                    </Text>
+                        <HStack spacing={2}>
+                            {movie.genres.map((genre) => (
+                                <Badge key={genre.id} colorScheme="teal">
+                                    {genre.name}
+                                </Badge>
+                            ))}
+                        </HStack>
 
-                    <Text color="gray.500">
-                        上映日期：{new Date(movie.release_date).toLocaleDateString('zh-TW')}
-                    </Text>
+                        <Divider />
 
-                    <Text color="gray.500">
-                        片長：{Math.floor(movie.runtime / 60)}小時{movie.runtime % 60}分鐘
-                    </Text>
+                        <Box>
+                            <Heading as="h2" size="md" mb={2}>
+                                劇情簡介
+                            </Heading>
+                            <Text>{movie.overview || '暫無劇情簡介'}</Text>
+                        </Box>
 
-                    <Box>
-                        <Text fontSize="xl" fontWeight="bold" mb={2}>
-                            劇情簡介
-                        </Text>
-                        <Text fontSize="lg" lineHeight="tall">
-                            {movie.overview || '暫無簡介'}
-                        </Text>
-                    </Box>
-                </VStack>
-            </HStack>
+                        <Box>
+                            <Heading as="h2" size="md" mb={2}>
+                                狀態
+                            </Heading>
+                            <Text>{movie.status}</Text>
+                        </Box>
+                    </VStack>
+                </GridItem>
+            </Grid>
         </Container>
     );
 } 
